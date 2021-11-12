@@ -38,7 +38,7 @@ lazy_static! {
 /// Get mass values by parsing input string
 fn get_masses(contents: String) -> Vec<i32> {
     RE.find_iter(&contents)
-        .map(|l| l.as_str().parse::<i32>().unwrap())
+        .map(|l| l.as_str().parse().unwrap())
         .collect()
 }
 
