@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use aoc_utils::read_input_file;
+use aoc_utils::{print_day_header, read_input_file};
 
 /// Calculate fuel for a given mass (logic for star 1)
 fn get_fuel_star1(mass: i32) -> i32 {
@@ -43,16 +43,18 @@ fn get_masses(contents: String) -> Vec<i32> {
 }
 
 fn main() {
+    print_day_header(1);
+
     // Get masses. This is done once because input is the same for both stars.
     let masses = get_masses(read_input_file(1));
 
     // Star 1
     let total_fuel = get_total_fuel(&masses, get_fuel_star1);
-    println!("{:?}", total_fuel);
+    println!("  Result Star 1: {:?}", total_fuel);
 
     // Star 2
     let total_fuel = get_total_fuel(&masses, get_fuel_star2);
-    println!("{:?}", total_fuel);
+    println!("  Result Star 2: {:?}", total_fuel);
 }
 
 /// Tests for star 1
