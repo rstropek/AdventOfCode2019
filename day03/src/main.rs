@@ -30,6 +30,7 @@ impl Movement {
 struct Point(i32, i32);
 
 impl Point {
+    /// Moves the current point one field into given direction
     fn move_point(&mut self, direction: u8) {
         self.0 += match direction {
             b'L' => -1,
@@ -48,67 +49,55 @@ trait PointCalculator {
     /// Parses content into movements and calculates all visited points from them
     fn to_points(&self) -> HashMap<Point, usize>;
 
-    // Parses content into movements and executes given closure on each movement
-    fn for_each_movement(&self, op: impl FnMut(Movement));
+    // Parses content into points and executes given closure on each of them
+    fn for_each_point(&self, op: impl FnMut(Point, usize));
 
-    // Parses movements and calls given
-    fn find_nearest_intersection(&self, other: &str) -> i32;
+    // Parses content into points and finds nearest intersection. The distance is calculated using a provided closure.
+    fn find_intersection(&self, other: &str, distance_fn: fn(Point, usize, &HashMap<Point, usize>) -> usize) -> usize;
 
+    // Finds nearest intersection to origin (Manhattan distance; star 1)
+    fn find_nearest_intersection(&self, other: &str) -> usize;
+
+    // Finds intersection with shortest path (star 2)
     fn find_shortest_intersection(&self, other: &str) -> usize;
+
 }
 
 impl PointCalculator for str {
     fn to_points(&self) -> HashMap<Point, usize> {
-        let mut current_position = Point(0i32, 0i32);
+        // Target for gathering all points
         let mut points: HashMap<Point, usize> = HashMap::new();
-        let mut distance_from_origin = 0usize;
-        self.for_each_movement(|m| {
-            for _ in 0..m.distance {
-                distance_from_origin += 1;
-                current_position.move_point(m.direction);
-                if !points.contains_key(&current_position) {
-                    points.insert(current_position, distance_from_origin);
-                }
-            }
+
+        // Iterate over all points
+        self.for_each_point(|current_position, distance_from_origin| {
+            points
+                .entry(current_position)
+                .or_insert(distance_from_origin);
         });
 
         points
     }
 
-    fn find_nearest_intersection(&self, other: &str) -> i32 {
-        let mut current_position = Point(0i32, 0i32);
-        let mut shortest_distance = i32::MAX;
-        let other_points = other.to_points();
-        self.for_each_movement(|m| {
-            for _ in 0..m.distance {
-                current_position.move_point(m.direction);
-                if other_points.contains_key(&current_position) {
-                    let distance = current_position.0.abs() + current_position.1.abs();
-                    if distance < shortest_distance {
-                        shortest_distance = distance;
-                    }
-                }
-            }
-        });
-
-        shortest_distance
+    fn find_nearest_intersection(&self, other: &str) -> usize {
+        self.find_intersection(other, |current_position, _, _| {
+            current_position.0.abs() as usize + current_position.1.abs() as usize
+        })
     }
 
-    
     fn find_shortest_intersection(&self, other: &str) -> usize {
-        let mut current_position = Point(0i32, 0i32);
+        self.find_intersection(other, |current_position, distance_from_origin, other_points| {
+            other_points.get(&current_position).unwrap() + distance_from_origin
+        })
+    }
+
+    fn find_intersection(&self, other: &str, distance_fn: fn(Point, usize, &HashMap<Point, usize>) -> usize) -> usize {
         let mut shortest_distance = usize::MAX;
-        let mut distance_from_origin = 0usize;
         let other_points = other.to_points();
-        self.for_each_movement(|m| {
-            for _ in 0..m.distance {
-                distance_from_origin += 1;
-                current_position.move_point(m.direction);
-                if other_points.contains_key(&current_position) {
-                    let distance = other_points.get(&current_position).unwrap() + distance_from_origin;
-                    if distance < shortest_distance {
-                        shortest_distance = distance;
-                    }
+        self.for_each_point(|current_position, distance_from_origin| {
+            if other_points.contains_key(&current_position) {
+                let distance = distance_fn(current_position, distance_from_origin, &other_points);
+                if distance < shortest_distance {
+                    shortest_distance = distance;
                 }
             }
         });
@@ -116,10 +105,18 @@ impl PointCalculator for str {
         shortest_distance
     }
 
-    fn for_each_movement(&self, op: impl FnMut(Movement)) {
+    fn for_each_point(&self, mut op: impl FnMut(Point, usize)) {
+        let mut current_position = Point(0i32, 0i32);
+        let mut distance_from_origin = 0usize;
         RE.captures_iter(self)
             .map(|m| Movement::new(&m[1], &m[2]))
-            .for_each(op);
+            .for_each(|m| {
+                for _ in 0..m.distance {
+                    distance_from_origin += 1;
+                    current_position.move_point(m.direction);
+                    op(current_position, distance_from_origin);
+                }
+            });
     }
 }
 
@@ -202,12 +199,11 @@ mod tests_star1 {
     }
 }
 
-/// Tests for star 1
+/// Tests for star 2
 #[cfg(test)]
 mod tests_star2 {
     use super::*;
 
-    
     #[test]
     fn test_1() {
         assert_eq!(30, "R8,U5,L5,D3".find_shortest_intersection("U7,R6,D4,L4"));
